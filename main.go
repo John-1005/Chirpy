@@ -37,7 +37,7 @@ func main() {
   mux.HandleFunc("GET /api/healthz", readinessHandler)
   mux.HandleFunc("GET /admin/metrics", apiCfg.countHandler)
   mux.HandleFunc("POST /admin/reset", apiCfg.resetHandler)
-  mux.HandleFunc("POST /api/validate_chrip", lengthHandler )
+  mux.HandleFunc("POST /api/validate_chirp", checkChirpHandler)
 
   server := http.Server{
     Handler: mux,
@@ -94,28 +94,5 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 
 }
 
-func (cfg *apiConfig) lengthHandler(w http.ResponseWriter, r *http.Request) {
 
-  type chirp struct {
-    Message string `json:"message"`
-  }
-
-  type errorResponse struct {
-    Error string `json:"error"`
-  }
-
-  decoder := json.NewDecoder(r.Body)
-  msg := chirp{}
-  err := decoder.Decode(&msg)
-
-  if err != nil {
-    w.WriteHeader(400)
-    return
-  }
-
-  if len(msg.Message) > 140 {
-    w.Writeheader(400)
-  }
-
-}
 
