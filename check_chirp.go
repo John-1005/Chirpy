@@ -3,18 +3,19 @@ package main
 import (
     "encoding/json"
     "net/http"
+    "strings"
 )
 
 
 
-func checkChirpHandler(w http.ResponseWriter, r *http.Request) {
+func handlerCheckChirp(w http.ResponseWriter, r *http.Request) {
   type message struct {
     Body string `json:"body"`
   }
 
 
-  type validate struct {
-    Valid bool `json:"valid"`
+  type ChirpResponse struct {
+    CleanedBody string `json:"cleaned_body"`
   }
 
   decoder := json.NewDecoder(r.Body)
@@ -33,7 +34,38 @@ func checkChirpHandler(w http.ResponseWriter, r *http.Request) {
     return
   }
 
-  respondWithJSON(w, http.StatusOK, validate{
-    Valid: true,
-  })
+  cleanedMessage := chirpFilter(msg.Body)
+
+  response := ChirpResponse{CleanedBody: cleanedMessage}
+  respondWithJSON(w, http.StatusOK, response)
+}
+
+
+
+func chirpFilter(message string) string {
+
+  words := strings.Split(message, " ")
+  
+  var cleanedWords []string
+
+  bannedWords := map[string]struct{} {
+    "kerfuffle": {},
+    "sharbert": {},
+    "fornax": {},
+  }
+
+  for _, w := range words {
+
+    lowered := strings.ToLower(w)
+    if _, banned := bannedWords[lowered]; banned {
+      cleanedWords = append(cleanedWords, "****")
+    }else{
+      cleanedWords = append(cleanedWords, w)
+    }
+
+  }
+
+  cleanedMessage := strings.Join(cleanedWords, " ")
+  return cleanedMessage
+
 }
