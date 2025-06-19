@@ -8,12 +8,14 @@ import (
     "os"
     "database/sql"
     "log"
-    "context"
+    "time"
+    "encoding/json"
 
 
     "github.com/John-1005/Chirpy/internal/database"
   _ "github.com/lib/pq"
     "github.com/joho/godotenv"
+    "github.com/google/uuid"
 )
 
 
@@ -23,6 +25,7 @@ import (
 type apiConfig struct {
     fileServerHits atomic.Int32
     db *database.Queries
+    platform string
 }
 
 type User struct {
@@ -64,6 +67,7 @@ func main() {
   apiCfg := &apiConfig{
       fileServerHits: atomic.Int32{},
       db:             dbQueries,
+      platform:       os.Getenv("PLATFORM"),
   }
 
 
@@ -76,8 +80,8 @@ func main() {
   mux.HandleFunc("GET /api/healthz", handlerReadiness)
   mux.HandleFunc("GET /admin/metrics", apiCfg.handlerCount)
   mux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
-  mux.HandleFunc("POST /api/validate_chirp", handlerCheckChirp)
-  mux.Handlefunc("POST /api/users", handlerCreateUser)
+  mux.HandleFunc("POST /api/chirps", handlerSendChirp)
+  mux.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
 
   server := http.Server{
     Handler: mux,
@@ -116,13 +120,18 @@ func (cfg *apiConfig) handlerCount(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
 
-  cfg.fileServerHits.Store(0)
+  if cfg.platform != "dev" {
+    respondWithError(w, 403, "Forbidden", nil)
+    return
+  }
 
-  w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+  err := cfg.db.DeleteUsers(r.Context())
+  if err != nil {
+    respondWithError(w, 500, "Failed to delete users", err )
+    return
+  }
 
   w.WriteHeader(http.StatusOK)
-
-  fmt.Fprintf(w, "Hit count reset to 0")
 
 }
 
@@ -149,12 +158,21 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
     return
   }
 
-  user, err := cfg.db.CreateUser(r.Context(), params.Email)
+  dbUser, err := cfg.db.CreateUser(r.Context(), params.Email)
   if err != nil {
-    fmt.Println("Failed to create user: %s", err)
-    os.Exit(1)
+    respondWithError(w, http.StatusInternalServerError, "Failed to create user", err)
+    return
   }
 
+  userResp := User{
+    ID:        dbUser.ID,
+    CreatedAt: dbUser.CreatedAt,
+    UpdatedAt: dbUser.UpdatedAt,
+    Email:     dbUser.Email,
+  }
+
+  respondWithJSON(w, http.StatusCreated, userResp)
 }
+
 
 
