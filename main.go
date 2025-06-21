@@ -19,9 +19,6 @@ import (
 )
 
 
-
-
-
 type apiConfig struct {
     fileServerHits atomic.Int32
     db *database.Queries
@@ -36,16 +33,13 @@ type User struct {
 }
 
 
-
-
-
-
-
-
-
-
-
-
+type Chirps struct {
+  ID uuid.UUID        `json:"id"`
+  CreatedAt time.Time `json:"created_at"`
+  UpdatedAt time.Time `json:"updated_at"`
+  Body string         `json:"body"`
+  User_ID uuid.UUID   `json:"user_id"`
+}
 
 
 func main() {
@@ -79,8 +73,9 @@ func main() {
   mux.Handle("/app/", apiCfg.middlewareMetricsInc(fileServer))
   mux.HandleFunc("GET /api/healthz", handlerReadiness)
   mux.HandleFunc("GET /admin/metrics", apiCfg.handlerCount)
+  mux.HandleFunc("GET /api/chirps", apiCfg.handlerGetChirps)
   mux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
-  mux.HandleFunc("POST /api/chirps", handlerSendChirp)
+  mux.HandleFunc("POST /api/chirps", apiCfg.handlerSendChirp)
   mux.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
 
   server := http.Server{
@@ -176,3 +171,77 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 
 
 
+
+
+func (cfg *apiConfig) handlerSendChirp(w http.ResponseWriter, r *http.Request) {
+
+  type message struct {
+    Body string `json:"body"`
+    User_ID uuid.UUID `json:"user_id"`
+  }
+
+
+  decoder := json.NewDecoder(r.Body)
+  params := message{}
+  err := decoder.Decode(&params)
+
+  if err != nil {
+    respondWithError(w, http.StatusInternalServerError, "Couldn't decode message", err)
+    return
+  }
+
+  dbChirpParams := database.AddChirpParams {
+    Body: params.Body,
+    UserID: params.User_ID,
+  }
+  const maxLength = 140
+
+  if len(params.Body) > maxLength {
+    respondWithError(w, http.StatusBadRequest, "Chirp is too long", nil )
+    return
+  }
+
+  dbChirp, err := cfg.db.AddChirp(r.Context(), dbChirpParams)
+  if err != nil {
+    respondWithError(w, http.StatusInternalServerError, "Failed to add chirp", err )
+  }
+
+  chirpResp := Chirps {
+    ID:        dbChirp.ID,
+    CreatedAt: dbChirp.CreatedAt,
+    UpdatedAt: dbChirp.UpdatedAt,
+    Body:      dbChirp.Body,
+    User_ID:   dbChirp.UserID,
+  }
+
+  respondWithJSON(w, http.StatusCreated, chirpResp)
+}
+
+
+func (cfg *apiConfig) handlerGetChirps (w http.ResponseWriter, r *http.Request) {
+
+
+  dbChirps, err := cfg.db.GetChirps(r.Context())
+  if err != nil {
+    respondWithError(w, http.StatusInternalServerError, "trouble accessing database", err)
+  }
+
+  apiChirps := make([]Chirps, len(dbChirps))
+  for i, dbChirp := range dbChirps {
+    apiChirps[i] = databaseChirpToApi(dbChirp)
+  }
+
+
+  respondWithJSON(w, http.StatusOK, apiChirps)
+}
+
+func databaseChirpToApi(dbChirp database.Chirp) Chirps {
+  return Chirps{
+      ID:        dbChirp.ID,
+      CreatedAt: dbChirp.CreatedAt,
+      UpdatedAt: dbChirp.UpdatedAt,
+      Body:      dbChirp.Body,
+      User_ID:   dbChirp.UserID,
+
+  }
+}
