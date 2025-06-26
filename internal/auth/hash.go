@@ -38,6 +38,7 @@ func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (str
 		UserID:    userID,
 		ExpiresIn: expiresIn,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiresIn)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			Issuer:    "Chirpy",
@@ -46,7 +47,7 @@ func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (str
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	tokenString, err := token.SignedString(tokenSecret)
+	tokenString, err := token.SignedString([]byte(tokenSecret))
 	if err != nil {
 		return "", err
 	}
@@ -58,12 +59,16 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 
 	token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(tokenSecret), nil
-	})
+	},
+		jwt.WithLeeway(0),
+		jwt.WithValidMethods([]string{"HS256"}),
+		jwt.WithExpirationRequired(),
+	)
 	if err != nil {
 		return uuid.Nil, err
 	}
 	claims, ok := token.Claims.(*CustomClaims)
-	if !ok || token.Valid {
+	if !ok || !token.Valid {
 		return uuid.Nil, fmt.Errorf("invalid token")
 	}
 
