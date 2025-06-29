@@ -17,7 +17,10 @@ import (
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
-
+UPDATE table_name 
+SET column1 = value1, column2 = value2, column3 = value3
+WHERE condition
+RETURNING *;
 type apiConfig struct {
 	fileServerHits atomic.Int32
 	db             *database.Queries
@@ -311,6 +314,58 @@ func (cfg *apiConfig) handlerRevoke(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (cfg *config) handlerUsers(w http.ResponseWriter, r *http.Request) {
+	type user struct {
+		Password: `json:"password"`
+		Email: `json:"email"`
+	}
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't find token", err)
+	}
+
+	userID, err = auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "invaild token", err)
+	}
+	
+	decoder := json.NewDecoder(r.Body)
+	params := user{}
+	err = decoder.Decode(&params)
+	
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "failed to decode Json", err)
+	}
+
+	hashedPassword, err = auth.HashPassword(params.Password)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "unable to hash password", err)
+	}
+
+	dbUserParams := database.CreateUserParams{
+		HashedPassword: hashedPassword,
+		Email:          params.Email,
+	}
+
+	dbUser, err := cfg.db.CreateUser(r.Context(), dbUserParams)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to create user", err)
+		return
+	}
+
+	userResp := User{
+		ID:        dbUser.ID,
+		CreatedAt: dbUser.CreatedAt,
+		UpdatedAt: dbUser.UpdatedAt,
+		Email:     dbUser.Email,
+	}
+
+	respondWithJSON(w, http.StatusCreated, userResp)
+}
+
 }
 
 func (cfg *apiConfig) handlerSendChirp(w http.ResponseWriter, r *http.Request) {
