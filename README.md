@@ -1,6 +1,10 @@
-This was a project to help me learn http.Servers, how to make and call API, how to handle requests. I also learned how to do a basic auth setup with hashing. 
+This was a project to help me learn http.Servers from boot.dev
+I learned how to make and call API, how to handle requests. I also learned how to do a basic auth setup with hashing. 
 Helped me learn about webhooks and how to implement into a project
 Also helped me learn how to better marshal and unmarshal JSON while accessing a sql database
+
+I feel like this was very useful and I learned a ton on how to build and how it works. I am saving this so I will always have a reference.
+
 
 Everything in this project is an internal setup accessing a local host
 
