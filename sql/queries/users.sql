@@ -14,3 +14,18 @@ RETURNING *;
 -- name: GetUserByEmail :one
 SELECT * FROM users
 WHERE email = $1;
+
+
+
+-- name: UpdateUsers :one
+UPDATE users 
+SET updated_at = NOW(), email = $1, hashed_password = $2
+WHERE id = $3
+RETURNING *;
+
+
+
+-- name: ChirpyRedUpgrade :exec
+UPDATE users
+SET is_chirpy_red = true
+WHERE id = $1;

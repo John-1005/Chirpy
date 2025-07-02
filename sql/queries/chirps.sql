@@ -20,3 +20,14 @@ ORDER BY created_at;
 -- name: GetChirpByID :one
 SELECT * FROM CHIRPS
 WHERE ID = $1;
+
+
+-- name: DeleteChirpByID :exec
+DELETE from chirps
+WHERE id = $1 and user_id = $2;
+
+
+-- name: GetChirpsByID :many
+SELECT * FROM CHIRPS
+WHERE user_id = $1;
+
